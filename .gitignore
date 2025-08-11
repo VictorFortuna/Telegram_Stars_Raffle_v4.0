@@ -1,0 +1,26 @@
+# Файлы зависимостей
+node_modules/
+dist/
+build/
+
+# Логи
+*.log
+npm-debug.log*
+
+# Файлы операционной системы
+.DS_Store
+Thumbs.db
+
+# Файлы IDE
+.idea/
+.vscode/
+*.swp
+
+# Секреты! НИКОГДА не коммитить .env файлы!
+.env
+.env.*
+!.env.example
+
+# Кэш
+.npm/
+.yarn/

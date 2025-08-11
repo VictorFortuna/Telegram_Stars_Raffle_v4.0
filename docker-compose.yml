@@ -1,0 +1,48 @@
+# Версия синтаксиса docker-compose
+version: '3.8'
+
+# Описание сервисов (контейнеров)
+services:
+  # Сервис базы данных PostgreSQL
+  db:
+    image: postgres:14-alpine
+    container_name: project_db
+    restart: always
+    environment:
+      - POSTGRES_USER=user      # Замените на ваше имя пользователя
+      - POSTGRES_PASSWORD=password # Замените на ваш пароль
+      - POSTGRES_DB=projectdb   # Замените на ваше имя БД
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # Сервис Backend
+  backend:
+    container_name: project_backend
+    build:
+      context: ./backend # Путь к Dockerfile бэкенда
+    restart: always
+    ports:
+      - '3001:3001'
+    depends_on:
+      - db
+    environment:
+      - DATABASE_URL=postgresql://user:password@db:5432/projectdb?schema=public
+      - PORT=3001
+      # Добавьте другие переменные окружения для бэкенда
+
+  # Сервис Frontend
+  frontend:
+    container_name: project_frontend
+    build:
+      context: ./frontend # Путь к Dockerfile фронтенда
+    restart: always
+    ports:
+      - '5173:5173'
+    depends_on:
+      - backend
+
+# Описание томов (для сохранения данных)
+volumes:
+  postgres_data:
