@@ -1,0 +1,57 @@
+name: CI Pipeline
+
+# Триггеры для запуска воркфлоу
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  # Задача для проверки бэкенда
+  build-and-test-backend:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: backend/package-lock.json
+
+    - name: Install backend dependencies
+      run: cd backend && npm install
+
+    - name: Run linter
+      run: cd backend && npm run lint
+
+    - name: Run tests
+      run: cd backend && npm run test
+
+  # Задача для проверки фронтенда
+  build-and-test-frontend:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+
+    - name: Install frontend dependencies
+      run: cd frontend && npm install
+
+    - name: Run linter
+      run: cd frontend && npm run lint
+
+    - name: Build project
+      run: cd frontend && npm run build
