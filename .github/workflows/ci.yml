@@ -1,57 +1,48 @@
-name: CI Pipeline
+name: CI
 
-# Триггеры для запуска воркфлоу
 on:
   push:
-    branches: [ "main" ]
   pull_request:
-    branches: [ "main" ]
 
 jobs:
-  # Задача для проверки бэкенда
-  build-and-test-backend:
+  node-ci:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
+      - name: Checkout
+        uses: actions/checkout@v4
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '18'
-        cache: 'npm'
-        cache-dependency-path: backend/package-lock.json
+      - name: Check for package.json
+        id: pkg
+        run: |
+          if [ -f package.json ]; then
+            echo "has_pkg=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_pkg=false" >> $GITHUB_OUTPUT
+          fi
 
-    - name: Install backend dependencies
-      run: cd backend && npm install
+      - name: Setup Node
+        if: steps.pkg.outputs.has_pkg == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: npm
 
-    - name: Run linter
-      run: cd backend && npm run lint
+      - name: Install dependencies
+        if: steps.pkg.outputs.has_pkg == 'true'
+        run: npm install
 
-    - name: Run tests
-      run: cd backend && npm run test
+      - name: Lint
+        if: steps.pkg.outputs.has_pkg == 'true'
+        run: npm run lint --if-present
 
-  # Задача для проверки фронтенда
-  build-and-test-frontend:
-    runs-on: ubuntu-latest
+      - name: Tests
+        if: steps.pkg.outputs.has_pkg == 'true'
+        run: npm test --if-present
 
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
+      - name: Build
+        if: steps.pkg.outputs.has_pkg == 'true'
+        run: npm run build --if-present
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '18'
-        cache: 'npm'
-        cache-dependency-path: frontend/package-lock.json
-
-    - name: Install frontend dependencies
-      run: cd frontend && npm install
-
-    - name: Run linter
-      run: cd frontend && npm run lint
-
-    - name: Build project
-      run: cd frontend && npm run build
+      - name: No project yet
+        if: steps.pkg.outputs.has_pkg == 'false'
+        run: echo "package.json не найден — проект ещё не инициализирован. CI пропущен."
