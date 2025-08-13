@@ -1,7 +1,3 @@
-// SupabaseRaffleRepository.ts (Draft)
-// NOTE: Сейчас без реальной транзакции (SIMPLE IMPLEMENTATION).
-// FUTURE: заменить addEntryTransactional на вызов RPC, обеспечивающий атомарность.
-
 import { supabase } from '../db/supabaseClient';
 import { Raffle } from '../../domain/entities/Raffle';
 import {
@@ -10,7 +6,6 @@ import {
   AddEntryResult
 } from '../../domain/repositories/RaffleRepository';
 
-// Вспомогательная функция преобразования row -> Raffle
 function mapRaffle(row: any): Raffle {
   return new Raffle({
     id: row.id,
@@ -35,7 +30,6 @@ function mapRaffle(row: any): Raffle {
 }
 
 export class SupabaseRaffleRepository implements RaffleRepository {
-
   async findActiveRaffle(): Promise<Raffle | null> {
     const { data, error } = await supabase
       .from('raffles')
@@ -43,11 +37,7 @@ export class SupabaseRaffleRepository implements RaffleRepository {
       .in('status', ['init','collecting','ready','drawing'])
       .order('id', { ascending: false })
       .limit(1);
-
-    if (error) {
-      console.error('[findActiveRaffle] error', error);
-      throw error;
-    }
+    if (error) throw error;
     if (!data || data.length === 0) return null;
     return mapRaffle(data[0]);
   }
@@ -67,11 +57,7 @@ export class SupabaseRaffleRepository implements RaffleRepository {
       })
       .select('*')
       .single();
-
-    if (error) {
-      console.error('[createRaffle] error', error);
-      throw error;
-    }
+    if (error) throw error;
     return mapRaffle(data);
   }
 
@@ -82,46 +68,35 @@ export class SupabaseRaffleRepository implements RaffleRepository {
   }
 
   async userHasEntry(raffleId: number, userId: bigint): Promise<boolean> {
-    const { data, error } = await supabase
+    const { data, error, count } = await supabase
       .from('raffle_entries')
-      .select('id', { count: 'exact', head: true })
+      .select('id', { head: true, count: 'exact' })
       .eq('raffle_id', raffleId)
       .eq('user_id', userId.toString());
-
-    if (error) {
-      console.error('[userHasEntry] error', error);
-      throw error;
-    }
-    return (data as any) === null ? false : true; // count head: true возвращает null data
+    if (error) throw error;
+    // head: true => data=null, используем count
+    return (count ?? 0) > 0;
   }
 
   async addEntryTransactional(raffleId: number, userId: bigint): Promise<AddEntryResult> {
-    // SIMPLE IMPLEMENTATION (псевдо транзакция)
-    // Шаги:
-    // 1. Проверка существует ли запись участия.
-    // 2. Если есть — вернуть updated raffle (без изменений).
-    // 3. Если нет — вставить entry, обновить raffle totals.
-    // РИСК: редкая гонка при одновременном двойном join (будем решать позже).
-
-    // 1. Проверка
+    // Упрощённо — без настоящей транзакции (гонки маловероятны, но возможны).
     const has = await this.userHasEntry(raffleId, userId);
     if (has) {
       const raffle = await this.getRaffleById(raffleId);
-      if (!raffle) throw new Error('Raffle not found after existing entry');
+      if (!raffle) throw new Error('Raffle not found');
       return {
         updatedRaffle: raffle,
         created: false,
-        thresholdReached: raffle.totalFund >= raffle.threshold
+        thresholdReached: raffle.toJSON().totalFund >= raffle.toJSON().threshold
       };
     }
 
-    // 2. Получить текущие totals (для sequence)
     const raffleBefore = await this.getRaffleById(raffleId);
     if (!raffleBefore) throw new Error('Raffle not found');
+    const prevEntries = raffleBefore.toJSON().totalEntries;
+    const nextSequence = prevEntries + 1;
 
-    const nextSequence = raffleBefore.totalEntries + 1;
-
-    // 3. Вставка entry
+    // Добавляем entry
     const { error: insertError } = await supabase
       .from('raffle_entries')
       .insert({
@@ -129,39 +104,28 @@ export class SupabaseRaffleRepository implements RaffleRepository {
         user_id: userId.toString(),
         entry_sequence: nextSequence
       });
+    if (insertError) throw insertError;
 
-    if (insertError) {
-      console.error('[addEntryTransactional] insert entry error', insertError);
-      throw insertError;
-    }
+    // Обновляем счётчики + если это первый участник, переводим статус init -> collecting
+    const shouldFlipToCollecting = raffleBefore.toJSON().status === 'init' && prevEntries === 0;
 
-    // 4. Обновить totals
     const { data: updatedRows, error: updateError } = await supabase
       .from('raffles')
       .update({
-        total_entries: raffleBefore.totalEntries + 1,
-        total_fund: raffleBefore.totalFund + raffleBefore.toJSON().entryCost
+        total_entries: prevEntries + 1,
+        total_fund: raffleBefore.toJSON().totalFund + raffleBefore.toJSON().entryCost,
+        status: shouldFlipToCollecting ? 'collecting' : raffleBefore.toJSON().status
       })
       .eq('id', raffleId)
       .select('*');
-
-    if (updateError) {
-      console.error('[addEntryTransactional] update raffle error', updateError);
-      throw updateError;
-    }
-
-    if (!updatedRows || updatedRows.length === 0) {
-      throw new Error('Failed to update raffle totals');
-    }
+    if (updateError) throw updateError;
+    if (!updatedRows || updatedRows.length === 0) throw new Error('Failed to update raffle');
 
     const updatedRaffle = mapRaffle(updatedRows[0]);
-    const thresholdReached = updatedRaffle.totalFund >= updatedRaffle.threshold;
+    const thresholdReached =
+      updatedRaffle.toJSON().totalFund >= updatedRaffle.toJSON().threshold;
 
-    return {
-      updatedRaffle,
-      created: true,
-      thresholdReached
-    };
+    return { updatedRaffle, created: true, thresholdReached };
   }
 
   async commitSeedIfThreshold(
@@ -169,18 +133,14 @@ export class SupabaseRaffleRepository implements RaffleRepository {
     seedHash: string,
     graceSeconds: number
   ): Promise<Raffle> {
-    // Устанавливаем seed_hash и переводим статус из init/collecting в ready (если threshold достигнут)
     const raffle = await this.getRaffleById(raffleId);
     if (!raffle) throw new Error('Raffle not found');
-    if (raffle.status === 'ready' || raffle.status === 'drawing' || raffle.status === 'completed') {
-      return raffle; // уже не нужно
-    }
-    if (raffle.totalFund < raffle.threshold) {
-      return raffle; // ещё не достигнут threshold
-    }
+    const r = raffle.toJSON();
+    if (r.status === 'ready' || r.status === 'drawing' || r.status === 'completed')
+      return raffle;
+    if (r.totalFund < r.threshold) return raffle;
 
     const now = new Date().toISOString();
-
     const { data, error } = await supabase
       .from('raffles')
       .update({
@@ -190,15 +150,10 @@ export class SupabaseRaffleRepository implements RaffleRepository {
         grace_seconds: graceSeconds
       })
       .eq('id', raffleId)
-      .eq('status', raffle.status) // чтобы не переписать если статус изменился конкурентно
+      .eq('status', r.status) // оптимистичная защита
       .select('*')
       .single();
-
-    if (error) {
-      console.error('[commitSeedIfThreshold] error', error);
-      throw error;
-    }
-
+    if (error) throw error;
     return mapRaffle(data);
   }
 
@@ -208,26 +163,18 @@ export class SupabaseRaffleRepository implements RaffleRepository {
       .select('user_id')
       .eq('raffle_id', raffleId)
       .order('entry_sequence', { ascending: true });
-
-    if (error) {
-      console.error('[listEntries] error', error);
-      throw error;
-    }
+    if (error) throw error;
     if (!data) return [];
     return data.map(r => BigInt(r.user_id));
   }
 
-  // Внутренний helper
   private async getRaffleById(id: number): Promise<Raffle | null> {
     const { data, error } = await supabase
       .from('raffles')
       .select('*')
       .eq('id', id)
       .single();
-    if (error) {
-      console.error('[getRaffleById] error', error);
-      return null;
-    }
+    if (error) return null;
     if (!data) return null;
     return mapRaffle(data);
   }
