@@ -1,82 +1,79 @@
 # FAIRNESS
-Status: Draft v0.1 (Updated with example)
 
-## 1. Цель
-Обеспечить прозрачную и проверяемую процедуру выбора победителя.
+(Существующий текст оставить выше если он уже есть — здесь добавляется/обновляется секция Implementation v0)
 
-## 2. Модель
-Commit–Reveal: публикуем hash(seed) до генерации результата. После — раскрываем seed. Используем HMAC для вычисления победителя.
+## Implementation v0 (Variant B)
 
-## 3. Алгоритм (кратко)
-1. При достижении threshold → генерируем seed (128 бит random).
-2. seed_hash = SHA256(seed).
-3. Публикуем seed_hash.
-4. После grace_period → собираем упорядоченный список user_id.
-5. Формируем JSON списка участников.
-6. hmac = HMAC_SHA256(seed, participants_json).
-7. Превращаем hmac (hex) в число.
-8. winner_index = число mod N.
-9. Победитель = список[winner_index].
-10. Раскрываем seed и выдаём данные для проверки.
+Цель: простой, проверяемый и детерминированный способ выбора победителя без скрытых параметров (кроме seed до момента раскрытия).
 
-## 4. Формат seed / hash
-- seed: 32 байта → hex (64 символа).
-- seed_hash: SHA256(seed).
+### Компоненты
 
-## 5. Формула
-winner_index = BigInt(HMAC_SHA256(seed, participants_json)) mod N
+1. seed — случайная строка (32 байта → hex 64 символа), генерируется на этапе достижения порога (threshold).
+2. seedHash = sha256(seed) — публикуется сразу (сохраняется в raffle.seed_hash).
+3. participantsHash = sha256(sortedUserIds.join(',')) — вычисляется в момент draw (но любой может воспроизвести после раскрытия списка участников).
+4. combined = seed + ':' + participantsHash — строка, из которой мы делаем winnerHash.
+5. winnerHash = sha256(combined).
+6. winnerIndex = (первые 16 hex символов winnerHash -> число) mod countParticipants.
+7. winnerUserId = sortedUserIds[winnerIndex].
 
-## 6. Пример (Черновик)
-Предположим:
-- Участники (по порядку присоединения) user_id: [1111, 2222, 3333, 4444, 5555] (N=5)
-- seed (генерируется при переходе в ready, скрыт до завершения):  
-  seed = d4f7c9b23aa8f8e2b6d9ee0e3f4c1a0bb9f2bd0c6af7c122d9f0c0ab55c9d312
-- seed_hash = SHA256(seed) = (пример) 9d7b1e6f4c6b23a0d2f4c1a... (усечено)
+### Почему так
 
-JSON участников (строка):
-["1111","2222","3333","4444","5555"]
+- Сортировка userIds гарантирует одинаковый порядок у всех проверяющих.
+- seedHash публикуется ДО раскрытия seed → нельзя «подобрать» seed после просмотра участников.
+- Использование participantsHash позволяет удостовериться, что список участников не менялся между commit и draw.
 
-hmac = HMAC_SHA256(seed, participants_json)  
-Допустим результат:
-hmac(hex) = 54c5f9e3b9d6a1ab17f2d0c41f9e881d0e7d55c3f4d2a9b7c6e8a1c2d3e4f5a1
+### Пример
 
-Преобразуем первые 16 hex (например) или всё значение в BigInt:
-value = BigInt('0x54c5f9e3b9d6a1ab17f2d0c41f9e881d0e7d55c3f4d2a9b7c6e8a1c2d3e4f5a1')
+(Чисто демонстрационный; значения не настоящие.)
 
-winner_index = value mod 5  
-Допустим value mod 5 = 3 → индекс 3 (с нуля) → победитель user_id = 4444.
+```
+Participants (raw order they joined):
+[ 5551110001, 5551110007, 5551110003 ]
 
-Публикуем:
-- seed
-- seed_hash
-- hmac
-- participants_hash = SHA256("1111:2222:3333:4444:5555")
-- winner_index = 3
-- победитель: 4444
+Sorted:
+[ 5551110001, 5551110003, 5551110007 ]
 
-Пользователь может пересчитать локально и убедиться.
+participantsJoined = "5551110001,5551110003,5551110007"
+participantsHash = sha256(participantsJoined)
+= a4d7c9... (64 hex)
 
-(Реальные значения seed_hash и hmac будут иными — этот пример иллюстративный.)
+seed = 9f2e0c4a5d... (64 hex)
+seedHash = sha256(seed)
+= 6b8d1f... (64 hex)  --> это мы знали заранее из raffle.seed_hash
 
-## 7. Команды / API
-/fairness, /details <id> и WebApp панель.
+combined = seed + ":" + participantsHash
+winnerHash = sha256(combined)
+= 3c71bf1a2e9bd5... (64 hex)
 
-## 8. Хеш списка участников
-participants_hash = SHA256(concat user_id через ':')
+first16 = 3c71bf1a2e9bd5ab
+number = 0x3c71bf1a2e9bd5ab (в десятичной форме большое число)
+winnerIndex = number mod 3
+= 1
 
-## 9. Потенциальные атаки
-(см. прежний список — не изменилось)
+winnerUserId = sorted[1] = 5551110003
+```
 
-## 10. Улучшения
-Внешние источники случайности, объединённый seed.
+### Проверка сторонним наблюдателем
 
-## 11. Инструкция
-1. Взять seed → SHA256 → сверить.
-2. Получить список (или его hash).
-3. Сформировать JSON, посчитать HMAC.
-4. mod N → индекс → сравнить.
+После завершения и раскрытия seed + списка участников:
+1. Сортирует IDs → формирует participantsJoined.
+2. Делает participantsHash = sha256(participantsJoined).
+3. Проверяет sha256(seed) == seedHash (из raffle).
+4. Делает combined = seed + ':' + participantsHash.
+5. Вычисляет sha256(combined) → winnerHash.
+6. Берёт первые 16 hex → число → mod на количество участников → winnerIndex.
+7. Сравнивает userId по этому индексу с объявленным победителем.
 
-## 12. TBD
-Добавить автоматическую утилиту проверки (WebApp).
+Если всё совпало — честность подтверждена.
 
-(Конец файла)
+### Ограничения v0
+
+- Нет HMAC с секретом сервера: любой может смоделировать все шаги — это нормально для прозрачности. (HMAC можно добавить позже для защиты от гипотетического «подбора seed» при большом количестве commit попыток — сейчас seed генерируется один раз сервером внутрь, без перебора.)
+- Секрет (seed) хранится в памяти до момента draw (позже можно: зашифрованное хранение в БД / redis).
+- Использование только первых 16 hex символов winnerHash — достаточно (64 бита) для равномерного распределения; можно брать больше / всё — результат не меняется по равномерности.
+
+### Будущие улучшения (Backlog)
+
+- Добавить HMAC(seed, serverSecret) или serverSecret для второго слоя.
+- Публиковать участника (winner proof) в формате JSON с полным набором хешей.
+- Версионирование алгоритма (fairness_version в таблице raffles).
