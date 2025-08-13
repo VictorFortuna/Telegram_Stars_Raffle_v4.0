@@ -1,6 +1,3 @@
-// RaffleRepository.ts (Draft Interface)
-// Интерфейс доступа к данным raffle / entries без привязки к конкретной БД.
-
 import { Raffle } from '../entities/Raffle';
 
 export interface CreateRaffleParams {
@@ -13,8 +10,19 @@ export interface CreateRaffleParams {
 
 export interface AddEntryResult {
   updatedRaffle: Raffle;
-  created: boolean;          // true если новая запись участия
-  thresholdReached: boolean; // true если после добавления достигнут threshold
+  created: boolean;
+  thresholdReached: boolean;
+}
+
+export interface FinalizeDrawParams {
+  raffleId: number;
+  seed: string;
+  seedHash: string;
+  winnerUserId: bigint;
+  winnerIndex: number;
+  participantsHash: string;
+  winnerHash: string;
+  fairnessVersion: string;
 }
 
 export interface RaffleRepository {
@@ -22,14 +30,8 @@ export interface RaffleRepository {
   createRaffle(params: CreateRaffleParams): Promise<Raffle>;
   findOrCreateActiveRaffle(params: CreateRaffleParams): Promise<Raffle>;
   userHasEntry(raffleId: number, userId: bigint): Promise<boolean>;
-  addEntryTransactional(
-    raffleId: number,
-    userId: bigint
-  ): Promise<AddEntryResult>;
-  commitSeedIfThreshold(
-    raffleId: number,
-    seedHash: string,
-    graceSeconds: number
-  ): Promise<Raffle>;
+  addEntryTransactional(raffleId: number, userId: bigint): Promise<AddEntryResult>;
+  commitSeedIfThreshold(raffleId: number, seedHash: string, graceSeconds: number): Promise<Raffle>;
   listEntries(raffleId: number): Promise<bigint[]>;
+  finalizeDraw(params: FinalizeDrawParams): Promise<Raffle>;
 }
