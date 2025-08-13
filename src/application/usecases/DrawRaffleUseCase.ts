@@ -1,11 +1,11 @@
 // DrawRaffleUseCase: завершение розыгрыша после grace.
-// Возвращает различные статусы без выбрасывания исключений в нормальных случаях.
+// Возвращает статусы без throw для контролируемой логики.
 import { RaffleRepository } from '../../domain/repositories/RaffleRepository';
 import { FairnessService } from '../../domain/services/FairnessService';
 import { seedVault } from '../../infrastructure/services/SeedVault';
 
 interface DrawInput {
-  raffleId?: number; // если не задан — берём активный ready
+  raffleId?: number; // Если не задан — берём активный ready
   now?: Date;
 }
 
@@ -50,8 +50,7 @@ export class DrawRaffleUseCase {
   async execute(input: DrawInput = {}): Promise<DrawResult> {
     let raffle = null;
     if (input.raffleId) {
-      // В текущем репозитории нет метода getById публично — можно расширить при необходимости.
-      // Пока просто используем findActiveRaffle и проверим id (MVP ограничение).
+      // (MVP) Нет отдельного getById, используем findActiveRaffle и сверяем id.
       const active = await this.repo.findActiveRaffle();
       if (!active || active.toJSON().id !== input.raffleId) {
         return { status: 'not_found', message: 'Raffle not found or not active', raffleId: input.raffleId };
@@ -69,12 +68,12 @@ export class DrawRaffleUseCase {
       return { status: 'wrong_status', message: `Raffle status is ${r.status}, expected ready`, raffleId: r.id };
     }
 
-    const now = input.now ?? new Date();
     if (!r.readyAt) {
       return { status: 'wrong_status', message: 'readyAt missing', raffleId: r.id };
     }
-    const readyMs = r.readyAt.getTime();
-    const notBefore = readyMs + r.graceSeconds * 1000;
+
+    const now = input.now ?? new Date();
+    const notBefore = r.readyAt.getTime() + r.graceSeconds * 1000;
     if (now.getTime() < notBefore) {
       return {
         status: 'too_early',
@@ -85,22 +84,18 @@ export class DrawRaffleUseCase {
       };
     }
 
-    // Получаем seed
     const seed = seedVault.get(r.id);
     if (!seed) {
-      return { status: 'missing_seed', message: 'Seed not found in vault (process restart?)', raffleId: r.id };
+      return { status: 'missing_seed', message: 'Seed not found in SeedVault (restart?)', raffleId: r.id };
     }
 
-    // Список участников
     const participantIds = await this.repo.listEntries(r.id);
     if (participantIds.length === 0) {
-      return { status: 'no_participants', message: 'No participants for raffle', raffleId: r.id };
+      return { status: 'no_participants', message: 'No participants', raffleId: r.id };
     }
 
-    // Вычисляем победителя
     const draw = this.fairness.computeWinner(seed, participantIds);
 
-    // Финализируем
     const finalized = await this.repo.finalizeDraw({
       raffleId: r.id,
       seed,
