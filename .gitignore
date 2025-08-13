@@ -1,26 +1,33 @@
-# Файлы зависимостей
+# Node
 node_modules/
 dist/
 build/
 
-# Логи
-*.log
-npm-debug.log*
-
-# Файлы операционной системы
-.DS_Store
-Thumbs.db
-
-# Файлы IDE
-.idea/
-.vscode/
-*.swp
-
-# Секреты! НИКОГДА не коммитить .env файлы!
+# Env / secrets
 .env
-.env.*
-!.env.example
+.env.local
+.env.*.local
 
-# Кэш
-.npm/
-.yarn/
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+logs/
+*.log
+
+# Editor / IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Coverage / test
+coverage/
+
+# WebApp build
+webapp/dist/
+
+# Misc
+*.swp

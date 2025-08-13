@@ -1,51 +1,19 @@
-# PROGRESS_LOG
-Status: Ongoing
-
-## Цель
-Фиксировать, что уже сделано, решения, и что дальше — для продолжения даже при потере контекста.
-
-## Формат секций
-- Дата
-- События
-- Решения / Agreement
-- Next Actions
-- Backlog / TBD
-
----
-
-### 2025-08-12 (Инициализация)
+### 2025-08-13 (Variant B baseline files committed via PR)
 События:
-- Определён формат проекта: Raffle игра на виртуальных Stars с будущим переходом к реальным.
-- Создан умный CI (не падает без package.json).
-- Сформирована полная документация (черновики).
+- Добавлены стартовые миграции (init_core, audit_and_transactions).
+- Добавлены каркасные сущности Raffle, FairnessService интерфейс, JoinRaffleUseCase заготовка.
+- Созданы .env.example, .gitignore, README.md, DEV_NOTES.
+- FAIRNESS.md дополнен примером.
 
 Решения:
-- Один активный raffle.
-- Виртуальный MODE=VIRTUAL сначала.
-- Модель комиссии: 70% победителю / 30% админ (регулируемо позже).
-- Fairness: commit–reveal + HMAC_SHA256.
-- Автостарт через 24 часа даже без порога.
-- Grace period: 30s.
-- Публичность: count + hash участников.
-- WebApp обязательна для финальной формы.
-- Supabase используется сразу.
+- URL WebApp пока (TBD/placeholder).
+- Следующий шаг будет выбран после мержа (приоритет пока не установлен).
 
-Next Actions (предложение):
-1. Подтверждение включения документов в репозиторий.
-2. Создать .env.example.
-3. Подготовить SQL миграции (migrations/).
-4. Реализовать каркас проекта (пустые файлы/директории).
-5. Реализовать базовый RaffleService (создание/получение текущего).
-6. Реализовать join flow (без fairness draw).
-7. Добавить fairness (seed commit/draw).
-8. Включить минимальный WebApp (позже).
+Next Actions (кандидаты):
+- Реализация RaffleRepository (Supabase).
+- Реализация FairnessService (генерация seed + HMAC).
+- Реализация JoinRaffleUseCase логики.
 
-Backlog / TBD:
-- TELEGRAM_STARS_OPTIONS.md (исследование).
-- Пример вычисления fairness в FAIRNESS.md.
-- Faucet / начальный баланс.
-- Jackpot архитектура.
-- Multi-winner режим.
-- SSE/WebSocket.
-
-(Конец файла)
+Backlog:
+- TELEGRAM_STARS_OPTIONS.md
+- Faucet / стартовый баланс логика

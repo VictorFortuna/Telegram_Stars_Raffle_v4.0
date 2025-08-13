@@ -1,99 +1,34 @@
-# Telegram Stars Raffle
+# Telegram Stars Raffle (MVP – Virtual Mode)
 
-![Build Status](https://github.com/VictorFortuna/Telegram_Stars_Raffle_v4.0/actions/workflows/main.yml/badge.svg)
-![License](https://img.shields.io/github/license/VictorFortuna/Telegram_Stars_Raffle_v4.0)
-![Repo Size](https://img.shields.io/github/repo-size/VictorFortuna/Telegram_Stars_Raffle_v4.0)
+Статус: Стартовая структура (Variant B baseline).
 
-## Краткое описание
+## Что это
+Мини-игра (Telegram Mini App + бот) с розыгрышем призового фонда. Сейчас используется виртуальная валюта (демо) — позже планируется переход на реальные Telegram Stars.
 
-Telegram Stars Raffle — это автоматизированная платформа для проведения честных розыгрышей (raffle/лотерей) в Telegram с использованием платежной системы Telegram Stars. Проект обеспечивает прозрачность, безопасность и удобство для пользователей, организаторов и победителей.
+## Основные характеристики (MVP)
+- Один активный розыгрыш.
+- Участие: фиксированная ставка (1 виртуальная "звезда").
+- Порог фонда + автозапуск через 24 часа.
+- Честность: commit–reveal (seed hash) + HMAC.
+- 70% победителю / 30% комиссия.
+- Виртуальный кошелёк (позже — реальный).
 
-## Основные возможности
+## Стек
+- Node.js (бот + HTTP API)
+- Supabase (PostgreSQL)
+- (Этап 3) WebApp (React/Vite)
 
-- Интеграция с Telegram Stars для платежей и идентификации
-- Прозрачный механизм выбора победителей
-- Удобный интерфейс для организации и управления розыгрышами
-- Защита данных и безопасность операций
-- Гибкая архитектура, ориентированная на масштабирование
+## Структура
+Смотри PROJECT_STRUCTURE.md
 
-## Технологический стек
+## Документация
+DEVELOPMENT_PLAN, DATABASE_SCHEMA, FAIRNESS и др. Прогресс фиксируется в PROGRESS_LOG.md.
 
-- Backend: Python (FastAPI)
-- Database: PostgreSQL
-- Frontend: React.js (или другой, см. PROJECT_STRUCTURE.md)
-- Docker для контейнеризации
-- Telegram API/Stars API
-
-## Документация проекта
-
-- [DEVELOPMENT_PLAN.md](./DEVELOPMENT_PLAN.md) — поэтапный план разработки
-- [DEVELOPMENT_METHODOLOGY.md](./DEVELOPMENT_METHODOLOGY.md) — методология и стандарты работы
-- [PROJECT_ANALYSIS_CHECKLIST.md](./PROJECT_ANALYSIS_CHECKLIST.md) — бизнес-цели, требования, риски
-- [API_ENDPOINTS.md](./API_ENDPOINTS.md) — описание backend-эндпоинтов
-- [DATABASE_SCHEMA.md](./DATABASE_SCHEMA.md) — схема и описание базы данных
-- [PROJECT_STRUCTURE.md](./PROJECT_STRUCTURE.md) — структура папок, файлов и назначение
-
-## Быстрый старт
-
-### Клонирование репозитория
-
-```bash
-git clone https://github.com/VictorFortuna/Telegram_Stars_Raffle_v4.0.git
-cd Telegram_Stars_Raffle_v4.0
-```
-
-### Настройка окружения
-
-1. Создайте файл `.env` на основе шаблона `.env.example`.
-2. Заполните переменные окружения:
-   - `TELEGRAM_BOT_TOKEN=...`
-   - `TELEGRAM_STARS_API_KEY=...`
-   - `DATABASE_URL=...` (например, для PostgreSQL)
-   - Другие, согласно [DEVELOPMENT_PLAN.md](./DEVELOPMENT_PLAN.md)
-
-### Запуск с помощью Docker
-
-```bash
-docker-compose up --build
-```
-
-### Локальный запуск (без Docker)
-
-- Backend:  
-  ```bash
-  cd backend
-  pip install -r requirements.txt
-  uvicorn main:app --reload
-  ```
-- Frontend:  
-  ```bash
-  cd frontend
-  npm install
-  npm start
-  ```
-
-## Ссылки на дополнительные документы
-
-- [Требования и цели](./PROJECT_ANALYSIS_CHECKLIST.md)
-- [Этапы и контрольные точки](./DEVELOPMENT_PLAN.md)
-- [Архитектура и структура](./PROJECT_STRUCTURE.md)
-- [Схема базы данных](./DATABASE_SCHEMA.md)
-- [API эндпоинты](./API_ENDPOINTS.md)
-- [Методология и стандарты](./DEVELOPMENT_METHODOLOGY.md)
-
-## Контрибьюторы
-
-- VictorFortuna (автор и основной разработчик)
-- [Добавьте сюда других участников, если появятся]
+## Запуск (предварительно)
+1. cp .env.example .env
+2. Заполнить ADMIN_USER_ID, TELEGRAM_BOT_TOKEN (когда будет), Supabase ключи.
+3. Применить миграции (см. scripts/DEV_NOTES.md).
+4. (Код пока каркасный) — дальше будут сервисы и бот.
 
 ## Лицензия
-
-MIT License. Подробности см. в файле [LICENSE](./LICENSE).
-
-## Обратная связь и поддержка
-
-По вопросам и предложениям — пишите в Telegram: @VictorFortuna
-
----
-
-**Перед началом работы обязательно ознакомьтесь с DEVELOPMENT_PLAN.md и PROJECT_ANALYSIS_CHECKLIST.md!**
+TBD.
