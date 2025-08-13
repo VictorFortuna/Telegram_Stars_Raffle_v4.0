@@ -80,6 +80,29 @@ Backlog / TBD:
 Next Actions:
 - Реализовать FairnessService: генерация seed, hash (sha256), определение победителя (HMAC или прямой deterministic random), participantsHash.
 - После реализации — интегрировать commitSeedIfThreshold c FairnessService.generateCommit().
+
+- ### 2025-08-13 (Join интеграция + commit fairness)
+События:
+- Реализован FairnessService (Variant B: seed + seedHash + participantsHash → winnerHash).
+- Добавлен SeedVault (in-memory) для хранения seed до момента draw.
+- Обновлён SupabaseRaffleRepository: статус init → collecting при первом участнике; commitSeedIfThreshold оптимистично переводит raffle в ready.
+- Обновлён JoinRaffleUseCase: теперь при достижении threshold выполняет fairness commit (генерирует seed, сохраняет seedHash в БД, seed кладёт в SeedVault).
+- Проведена ручная интеграция (пользователь подтвердил «Интеграция применена»).
+Решения:
+- Seed не persists (при рестарте — потеря; допустимо для MVP).
+- Псевдо‑транзакции без блокировок — риск гонки минимальный (будет улучшено позже).
+- commit выполняется ровно один раз за счёт проверки статуса и оптимистичного update.
+Next Actions:
+- Добавить функциональность draw (выбор победителя после grace): DrawRaffleUseCase.
+- Расширить схему для хранения результатов (winner_user_id, winner_index, participants_hash, winner_hash) — обсудить формат.
+- Реализовать reveal: записать seed_revealed, winner_* поля, статус -> completed.
+- Обновить FAIRNESS.md примером полного proof после draw.
+Backlog / TBD:
+- Persist seed (таблица raffle_secrets или шифрованное хранение).
+- Атомарный join через RPC/SQL (уменьшение гонок).
+- Авто-триггер draw по таймеру (cron / background job).
+- Формирование JSON proof (для API / публикации в канале).
+- Версионирование fairness алгоритма в таблице (fairness_version).
 Backlog / TBD:
 - RPC/SQL функция для атомарного join (уменьшить гонки).
 - Обновить миграцию / добавить новую с безопасным ENUM IF NOT EXISTS (при появлении новой среды).
