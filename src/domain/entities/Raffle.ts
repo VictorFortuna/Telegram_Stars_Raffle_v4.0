@@ -1,4 +1,4 @@
-// Raffle entity (Draft)
+// Raffle entity (updated with draw result fields)
 export type RaffleStatus =
   | 'init'
   | 'collecting'
@@ -26,6 +26,12 @@ export interface RaffleProps {
   cancelledReason?: string | null;
   autoStartedDueToTimeout: boolean;
   graceSeconds: number;
+  // New fairness result fields
+  winnerUserId?: bigint | null;
+  winnerIndex?: number | null;
+  participantsHash?: string | null;
+  winnerHash?: string | null;
+  fairnessVersion?: string | null;
 }
 
 export class Raffle {
