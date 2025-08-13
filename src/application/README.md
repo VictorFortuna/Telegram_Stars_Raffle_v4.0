@@ -1,0 +1,1 @@
+UseCases: сценарии высокого уровня (join, draw, cancel). Координируют domain + infrastructure.
