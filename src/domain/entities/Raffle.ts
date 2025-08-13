@@ -26,7 +26,7 @@ export interface RaffleProps {
   cancelledReason?: string | null;
   autoStartedDueToTimeout: boolean;
   graceSeconds: number;
-  // New fairness result fields
+  // Fairness result fields
   winnerUserId?: bigint | null;
   winnerIndex?: number | null;
   participantsHash?: string | null;
