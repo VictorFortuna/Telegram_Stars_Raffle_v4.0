@@ -31,7 +31,7 @@ async function main() {
   };
   
   const joinRaffleUseCase = new JoinRaffleUseCase(raffleRepo, fairnessService, defaults, walletProvider);
-  const drawRaffleUseCase = new DrawRaffleUseCase(raffleRepo, fairnessService);
+  const drawRaffleUseCase = new DrawRaffleUseCase(raffleRepo, fairnessService, walletProvider);
 
   // Create and start bot
   const bot = createBot({

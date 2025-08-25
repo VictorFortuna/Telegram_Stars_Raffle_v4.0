@@ -30,7 +30,7 @@ async function testCompleteFlow() {
     };
 
     const joinUseCase = new JoinRaffleUseCase(raffleRepo, fairnessService, defaults, walletProvider);
-    const drawUseCase = new DrawRaffleUseCase(raffleRepo, fairnessService);
+    const drawUseCase = new DrawRaffleUseCase(raffleRepo, fairnessService, walletProvider);
 
     // Test users
     const users = [
@@ -100,13 +100,27 @@ async function testCompleteFlow() {
       console.log(`   ❌ Draw failed: ${drawResult.status} - ${drawResult.message || ''}`);
     }
 
-    console.log('\n6️⃣ Final raffle state...');
+    console.log('\n6️⃣ Final raffle state and balances...');
     const finalRaffle = await raffleRepo.findActiveRaffle();
     if (finalRaffle) {
       const fr = finalRaffle.toJSON();
       console.log(`   Raffle #${fr.id}: ${fr.status}`);
       console.log(`   Winner: ${fr.winnerUserId} (index ${fr.winnerIndex})`);
       console.log(`   Completed: ${fr.completedAt}`);
+      console.log(`   Total fund: ${fr.totalFund} ⭐, Winner share: ${fr.winnerSharePercent}%`);
+      
+      // Check winner's balance
+      if (fr.winnerUserId) {
+        const winnerBalance = await walletProvider.getBalance(fr.winnerUserId);
+        const expectedWinnings = Math.floor(fr.totalFund * fr.winnerSharePercent / 100);
+        console.log(`   Winner balance: ${winnerBalance} ⭐ (gained ~${expectedWinnings} ⭐)`);
+      }
+    }
+
+    console.log('\n   Final balances:');
+    for (const user of users) {
+      const balance = await walletProvider.getBalance(user.id);
+      console.log(`   ${user.name}: ${balance} ⭐`);
     }
 
     console.log('\n✅ Test completed successfully!');
