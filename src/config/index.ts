@@ -13,6 +13,11 @@ interface AppConfig {
   apiPort: number;
   logLevel: string;
   enableAutoCreateNext: boolean;
+  // Bot & DB
+  telegramBotToken: string;
+  supabaseUrl: string;
+  supabaseAnonKey: string;
+  nodeEnv: string;
 }
 
 function requireEnv(key: string, fallback?: string): string {
@@ -34,7 +39,12 @@ export const config: AppConfig = {
   commissionPercent: parseInt(requireEnv('COMMISSION_PERCENT', '30'), 10),
   apiPort: parseInt(requireEnv('API_PORT', '3000'), 10),
   logLevel: process.env.LOG_LEVEL || 'info',
-  enableAutoCreateNext: requireEnv('ENABLE_AUTO_CREATE_NEXT', '1') === '1'
+  enableAutoCreateNext: requireEnv('ENABLE_AUTO_CREATE_NEXT', '1') === '1',
+  // Bot & DB
+  telegramBotToken: requireEnv('TELEGRAM_BOT_TOKEN'),
+  supabaseUrl: requireEnv('SUPABASE_URL'),
+  supabaseAnonKey: requireEnv('SUPABASE_ANON_KEY'),
+  nodeEnv: process.env.NODE_ENV || 'development'
 };
 
 // Простая проверка суммы процентов

@@ -2,6 +2,7 @@
 // Возвращает статусы без throw для контролируемой логики.
 import { RaffleRepository } from '../../domain/repositories/RaffleRepository';
 import { FairnessService } from '../../domain/services/FairnessService';
+import { WalletProvider } from '../../domain/services/WalletProvider';
 import { seedVault } from '../../infrastructure/services/SeedVault';
 
 interface DrawInput {
@@ -44,7 +45,8 @@ export type DrawResult =
 export class DrawRaffleUseCase {
   constructor(
     private repo: RaffleRepository,
-    private fairness: FairnessService
+    private fairness: FairnessService,
+    private walletProvider: WalletProvider
   ) {}
 
   async execute(input: DrawInput = {}): Promise<DrawResult> {
@@ -108,6 +110,22 @@ export class DrawRaffleUseCase {
     });
 
     const f = finalized.toJSON();
+    
+    // Calculate and pay out winnings
+    const winnerShare = Math.floor(f.totalFund * f.winnerSharePercent / 100);
+    if (winnerShare > 0) {
+      const payoutSuccess = await this.walletProvider.credit(
+        draw.winnerUserId,
+        winnerShare,
+        `Raffle #${f.id} winnings (${f.winnerSharePercent}% of ${f.totalFund})`
+      );
+      
+      if (!payoutSuccess) {
+        console.error(`Failed to pay out winnings to user ${draw.winnerUserId}`);
+        // Continue anyway - the raffle is still completed, payout can be manual
+      }
+    }
+
     return {
       status: 'success',
       raffleId: f.id,

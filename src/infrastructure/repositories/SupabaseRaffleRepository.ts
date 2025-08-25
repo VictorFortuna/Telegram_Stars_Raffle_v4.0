@@ -139,7 +139,7 @@ export class SupabaseRaffleRepository implements RaffleRepository {
     const thresholdReached =
       updatedRaffle.toJSON().totalFund >= updatedRaffle.toJSON().threshold;
 
-    return { updatedRaffle, created: true, thresholdReached };
+    return { updatedRaffle, created: true, thresholdReached, entrySequence: nextSequence };
   }
 
   async commitSeedIfThreshold(
@@ -204,4 +204,8 @@ export class SupabaseRaffleRepository implements RaffleRepository {
     if (error) throw error;
     return mapRaffle(data);
   }
+}
+
+export function createSupabaseRaffleRepository(): RaffleRepository {
+  return new SupabaseRaffleRepository();
 }
