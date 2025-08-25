@@ -12,6 +12,7 @@ export interface AddEntryResult {
   updatedRaffle: Raffle;
   created: boolean;
   thresholdReached: boolean;
+  entrySequence?: number; // Only present if created = true
 }
 
 export interface FinalizeDrawParams {

@@ -2,25 +2,35 @@
 // Интеграция Variant B Fairness (commit только, без draw).
 import { RaffleRepository } from '../../domain/repositories/RaffleRepository';
 import { FairnessService } from '../../domain/services/FairnessService';
+import { WalletProvider } from '../../domain/services/WalletProvider';
 import { seedVault } from '../../infrastructure/services/SeedVault';
 
 interface JoinInput {
   userId: bigint;
   username?: string;
+  entryCost?: number; // Optional, will use default from raffle
 }
 
-interface JoinOutput {
+interface JoinSuccess {
+  status: 'success';
   raffleId: number;
-  alreadyJoined: boolean;
-  status: string;
+  entrySequence: number;
   totalEntries: number;
   totalFund: number;
   threshold: number;
-  reachedThreshold: boolean;
+  thresholdReached: boolean;
   committed: boolean;        // произошло ли (или было уже) закрепление seedHash
   graceSeconds: number;
   entryCost: number;
 }
+
+interface JoinError {
+  status: 'already_joined' | 'no_active_raffle' | 'insufficient_balance' | 'raffle_full';
+  raffleId?: number;
+  message?: string;
+}
+
+type JoinOutput = JoinSuccess | JoinError;
 
 export interface RaffleDefaults {
   threshold: number;
@@ -34,11 +44,24 @@ export class JoinRaffleUseCase {
   constructor(
     private raffleRepo: RaffleRepository,
     private fairnessService: FairnessService,
-    private defaults: RaffleDefaults
+    private defaults: RaffleDefaults,
+    private walletProvider: WalletProvider
   ) {}
 
   // Основной метод
   async execute(input: JoinInput): Promise<JoinOutput> {
+    // 0. Ensure user exists and check balance
+    await this.walletProvider.ensureUser(input.userId);
+    const balance = await this.walletProvider.getBalance(input.userId);
+    const entryCost = input.entryCost || this.defaults.entryCost;
+    
+    if (balance < entryCost) {
+      return {
+        status: 'insufficient_balance',
+        message: `Insufficient balance: ${balance}, required: ${entryCost}`
+      };
+    }
+
     // 1. Получаем или создаём активный raffle
     const active = await this.raffleRepo.findOrCreateActiveRaffle({
       threshold: this.defaults.threshold,
@@ -50,6 +73,14 @@ export class JoinRaffleUseCase {
 
     const raffleBefore = active.toJSON();
 
+    // Check if raffle is still accepting entries
+    if (!['init', 'collecting', 'ready'].includes(raffleBefore.status)) {
+      return {
+        status: 'no_active_raffle',
+        message: `Raffle is in status: ${raffleBefore.status}`
+      };
+    }
+
     // 2. Пытаемся добавить участника
     const addResult = await this.raffleRepo.addEntryTransactional(active.id, input.userId);
     const raffleAfter = addResult.updatedRaffle.toJSON();
@@ -58,7 +89,30 @@ export class JoinRaffleUseCase {
     const reachedThreshold = addResult.thresholdReached;
     let committed = false;
 
-    // 3. Если достигнут threshold и ещё не статус ready -> commit
+    // Handle already joined case
+    if (alreadyJoined) {
+      return {
+        status: 'already_joined',
+        raffleId: raffleAfter.id
+      };
+    }
+
+    // 3. Debit the entry cost after successful join
+    const debitSuccess = await this.walletProvider.debit(
+      input.userId, 
+      entryCost, 
+      `Entry to raffle #${raffleAfter.id}`
+    );
+    
+    if (!debitSuccess) {
+      // This shouldn't happen since we checked balance above, but just in case
+      return {
+        status: 'insufficient_balance',
+        message: 'Failed to debit entry cost - concurrent modification?'
+      };
+    }
+
+    // 4. Если достигнут threshold и ещё не статус ready -> commit
     if (reachedThreshold && raffleAfter.status !== 'ready') {
       const commit = this.fairnessService.generateCommit(raffleAfter.graceSeconds);
       // Сохраняем seed в память (если не был)
@@ -77,13 +131,13 @@ export class JoinRaffleUseCase {
     }
 
     return {
+      status: 'success',
       raffleId: raffleAfter.id,
-      alreadyJoined,
-      status: raffleAfter.status,
+      entrySequence: addResult.entrySequence || 0,
       totalEntries: raffleAfter.totalEntries,
       totalFund: raffleAfter.totalFund,
       threshold: raffleAfter.threshold,
-      reachedThreshold,
+      thresholdReached: reachedThreshold,
       committed,
       graceSeconds: raffleAfter.graceSeconds,
       entryCost: raffleAfter.entryCost
@@ -95,7 +149,8 @@ export class JoinRaffleUseCase {
 export function createJoinRaffleUseCase(
   repo: RaffleRepository,
   fairness: FairnessService,
-  defaults: RaffleDefaults
+  defaults: RaffleDefaults,
+  walletProvider: WalletProvider
 ) {
-  return new JoinRaffleUseCase(repo, fairness, defaults);
+  return new JoinRaffleUseCase(repo, fairness, defaults, walletProvider);
 }
